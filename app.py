@@ -1,0 +1,235 @@
+import os
+import re
+import pandas as pd
+import psycopg2
+import streamlit as st
+from dotenv import load_dotenv
+import streamlit as st
+
+
+load_dotenv()
+
+
+def get_conn():
+    return psycopg2.connect(
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        host=os.getenv("DB_HOST"),
+    )
+
+
+INDEX_AUTHORS = """
+CREATE INDEX IF NOT EXISTS idx_books_authors_rating
+ON books (authors, average_rating)
+"""
+
+INDEX_NUM_PAGES = """
+CREATE INDEX IF NOT EXISTS idx_books_num_pages
+ON books (num_pages)
+"""
+
+INDEX_RATING = """
+CREATE INDEX IF NOT EXISTS idx_books_average_rating
+ON books (average_rating)
+"""
+
+
+def search_by_author(author):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT title, authors, average_rating
+                FROM books
+                WHERE authors ILIKE %s
+                ORDER BY average_rating DESC
+                """,
+                (f"%{author}%",),
+            )
+            return cur.fetchall()
+
+
+def filter_by_num_pages(min_pages, max_pages):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT title, authors, num_pages
+                FROM books
+                WHERE num_pages BETWEEN %s AND %s
+                ORDER BY num_pages ASC
+                """,
+                (min_pages, max_pages),
+            )
+            return cur.fetchall()
+
+
+def top_rated_books(limit):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT title, authors, average_rating
+                FROM books
+                ORDER BY average_rating DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cur.fetchall()
+
+
+def explain_query(sql, params=None):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("EXPLAIN ANALYZE " + sql, params)
+            rows = cur.fetchall()
+            return "\n".join(row[0] for row in rows)
+
+
+def parse_explain(plain_text):
+    result = {}
+
+    if "Index Scan" in plain_text:
+        result["scan_type"] = "Index Scan"
+    elif "Bitmap Heap Scan" in plain_text:
+        result["scan_type"] = "Bitmap Heap Scan"
+    else:
+        result["scan_type"] = "Sequential Scan"
+
+    m = re.search(r"Execution Time: ([\d.]+) ms", plain_text)
+    result["execution_time"] = float(m.group(1)) if m else None
+    return result
+
+
+def compare_indexes(sql, params, index_sql):
+    before_plan = explain_query(sql, params)
+    before = parse_explain(before_plan)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(index_sql)
+            conn.commit()
+
+    after_plan = explain_query(sql, params)
+    after = parse_explain(after_plan)
+
+    return {
+        "before": before,
+        "after": after,
+        "before_plan": before_plan,
+        "after_plan": after_plan,
+    }
+
+
+def rows_to_df(rows, columns):
+    return pd.DataFrame(rows, columns=columns)
+
+
+st.set_page_config(page_title="Books Explorer", layout="wide")
+st.title("Books Explorer")
+st.caption("Search, filter, top-rated list, and query-plan comparison.")
+
+with st.sidebar:
+    st.subheader("Database Status")
+    if st.button("Test Connection"):
+        try:
+            with get_conn():
+                pass
+            st.success("Connected")
+        except Exception as e:
+            st.error(f"Connection failed: {e}")
+
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Author Search", "Page Filter", "Top Rated", "Explain + Index"]
+)
+
+with tab1:
+    st.subheader("Search by Author")
+    author = st.text_input("Author name", value="Rowling")
+    if st.button("Run Author Search"):
+        rows = search_by_author(author)
+        st.dataframe(
+            rows_to_df(rows, ["title", "authors", "average_rating"]),
+            use_container_width=True,
+        )
+
+with tab2:
+    st.subheader("Filter by Number of Pages")
+    c1, c2 = st.columns(2)
+    min_pages = c1.number_input("Min pages", min_value=0, value=100)
+    max_pages = c2.number_input("Max pages", min_value=0, value=400)
+    if st.button("Run Page Filter"):
+        rows = filter_by_num_pages(min_pages, max_pages)
+        st.dataframe(
+            rows_to_df(rows, ["title", "authors", "num_pages"]),
+            use_container_width=True,
+        )
+
+with tab3:
+    st.subheader("Top Rated Books")
+    limit = st.slider("How many books", min_value=5, max_value=100, value=20)
+    if st.button("Load Top Rated"):
+        rows = top_rated_books(limit)
+        st.dataframe(
+            rows_to_df(rows, ["title", "authors", "average_rating"]),
+            use_container_width=True,
+        )
+
+with tab4:
+    st.subheader("EXPLAIN ANALYZE and Index Impact")
+    query_type = st.selectbox(
+        "Choose query",
+        ["Author Search", "Page Filter", "Top Rated"],
+    )
+
+    if query_type == "Author Search":
+        author_exp = st.text_input("Author for explain", value="Rowling")
+        sql = """
+            SELECT title, authors, average_rating
+            FROM books
+            WHERE authors ILIKE %s
+        """
+        params = (f"%{author_exp}%",)
+        index_sql = INDEX_AUTHORS
+
+    elif query_type == "Page Filter":
+        min_exp = st.number_input("Explain min pages", min_value=0, value=100)
+        max_exp = st.number_input("Explain max pages", min_value=0, value=500)
+        sql = """
+            SELECT title, authors, num_pages
+            FROM books
+            WHERE num_pages BETWEEN %s AND %s
+        """
+        params = (min_exp, max_exp)
+        index_sql = INDEX_NUM_PAGES
+
+    else:
+        limit_exp = st.number_input("Explain top limit", min_value=1, value=20)
+        sql = """
+            SELECT title, authors, average_rating
+            FROM books
+            ORDER BY average_rating DESC
+            LIMIT %s
+        """
+        params = (limit_exp,)
+        index_sql = INDEX_RATING
+
+    if st.button("Compare Before and After Index"):
+        result = compare_indexes(sql, params, index_sql)
+
+        b = result["before"]
+        a = result["after"]
+
+        c1, c2 = st.columns(2)
+        c1.metric("Before scan", b.get("scan_type", "N/A"))
+        c2.metric("After scan", a.get("scan_type", "N/A"))
+
+        c3, c4 = st.columns(2)
+        c3.metric("Before execution ms", b.get("execution_time"))
+        c4.metric("After execution ms", a.get("execution_time"))
+
+        st.text("Before plan")
+        st.code(result["before_plan"], language="sql")
+        st.text("After plan")
+        st.code(result["after_plan"], language="sql")
