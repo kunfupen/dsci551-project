@@ -4,20 +4,23 @@ import pandas as pd
 import psycopg
 import streamlit as st
 from dotenv import load_dotenv
-import streamlit as st
-
 
 load_dotenv()
 
 
 def get_conn():
+    host = (os.getenv("DB_HOST") or "").strip()
+    if host.startswith("http://") or host.startswith("https://"):
+        host = host.split("://", 1)[1]
+    host = host.split("/", 1)[0].strip().strip(".")
+
     return psycopg.connect(
         dbname=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT", 5432),
-        sslmode=os.getenv("DB_SSLMODE", "required")
+        host=host,
+        port=str(os.getenv("DB_PORT", "5432")),
+        sslmode=os.getenv("DB_SSLMODE", "require"),  # require, not required
     )
 
 
