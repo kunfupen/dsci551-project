@@ -1,7 +1,7 @@
 import os
 import re
 import pandas as pd
-import psycopg2
+import psycopg
 import streamlit as st
 from dotenv import load_dotenv
 import streamlit as st
@@ -11,7 +11,7 @@ load_dotenv()
 
 
 def get_conn():
-    return psycopg2.connect(
+    return psycopg.connect(
         dbname=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
         host=os.getenv("DB_HOST"),
