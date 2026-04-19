@@ -320,6 +320,6 @@ pick = st.selectbox(
     options=[r["threshold"] for r in sweep],
 )
 chosen = next(r for r in sweep if r["threshold"] == pick)
-st.code(chosen["plan_text"], language="sql)
+st.code(chosen["plan_text"], language="sql")
         
     
