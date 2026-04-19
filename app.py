@@ -289,8 +289,8 @@ if st.button("Run Selectivity Sweep"):
     ]
     sweep = selectivity_sweep(thresholds)
 
-summary_df = pd.DataFrame([
-    {
+    summary_df = pd.DataFrame([
+        {
         "threshold": r["threshold"],
         "scan_type": r["scan_type"],
         "estimated_rows": r["estimated_rows"],
