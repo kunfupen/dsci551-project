@@ -268,7 +268,14 @@ with tab4:
         st.code(result["after_plan"], language="sql")
 with tab5:
     st.subheader("Selectivity vs Plan Choice")
-    # ... inputs and sliders ...
+
+    st.markdown("**Query:** `SELECT ... FROM books WHERE average_rating >= threshold`")
+
+    min_t = st.number_input("Min threshold", value=0.0, step=0.5,
+                            min_value=0.0, max_value=5.0)
+    max_t = st.number_input("Max threshold", value=5.0, step=0.5,
+                            min_value=0.0, max_value=5.0)
+    steps = st.slider("Number of threshold steps", min_value=3, max_value=15, value=8)
 
     if st.button("Run Selectivity Sweep"):
         with get_conn() as conn:
