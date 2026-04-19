@@ -174,7 +174,7 @@ with st.sidebar:
             st.error(f"Connection failed: {e}")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Author Search", "Page Filter", "Top Rated", "Explain + Index", "Selectivity Demo]
+    ["Author Search", "Page Filter", "Top Rated", "Explain + Index", "Selectivity Demo"]
 )
 
 with tab1:
