@@ -94,18 +94,33 @@ def explain_query(sql, params=None):
 
 
 def parse_explain(plain_text):
-    result = {}
+    results = {}
 
+    # Look for the scan type in the Explain
     if "Index Scan" in plain_text:
-        result["scan_type"] = "Index Scan"
+        results["scan_type"] = "Index Scan"
     elif "Bitmap Heap Scan" in plain_text:
-        result["scan_type"] = "Bitmap Heap Scan"
+        results["scan_type"] = "Bitmap Heap Scan"
     else:
-        result["scan_type"] = "Sequential Scan"
+        results["scan_type"] = "Sequential Scan"
 
-    m = re.search(r"Execution Time: ([\d.]+) ms", plain_text)
-    result["execution_time"] = float(m.group(1)) if m else None
-    return result
+    # Look for the Execution time in the Explain
+    time_match = re.search(r"Execution Time: ([\d.]+) ms", plain_text)
+    results["execution_time"] = float(time_match.group(1)) if time_match else None
+
+    # Predicted costs and rows
+    first_line = plain_text.splitlines()[0] if plain_text else ""
+    cost_match = re.search(r"cost=([\d.]+)\.\.([\d.]+)", first_line)
+    rows_match = re.search(r"rows=(\d+)", first_line)
+    results["startup_cost"] = float(cost_match.group(1)) if cost_match else None
+    results["total_cost"] = float(cost_match.group(2)) if cost_match else None
+    results["estimated_rows"] = int(rows_match.group(1)) if rows_match else None
+
+    # Pull the actual rows returned
+    actual_match = re.search(r"Actual Time: [\d.]+\.\.[\d.]+ rows=(\d+)", plain_text)
+    results["actual_rows"] = int(actual_match.group(1)) if actual_match else None
+
+    return results
 
 
 def compare_indexes(sql, params, index_sql):
@@ -126,6 +141,18 @@ def compare_indexes(sql, params, index_sql):
         "before_plan": before_plan,
         "after_plan": after_plan,
     }
+
+def selectivity_sweep(thresholds):
+    sql = """SELECT title, authors, average_rating FROM books WHERE average_rating >= %s"""
+
+    results = []
+    for t in thresholds:
+      plan_text = explain_query(sql, (t,))
+      parsed = parse_explain(plan_text)
+      parsed["threshold"] = t
+      parsed["plain_text"] = plan_text
+      results.append(parsed)
+    return results
 
 
 def rows_to_df(rows, columns):
