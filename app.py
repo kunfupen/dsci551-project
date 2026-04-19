@@ -150,7 +150,7 @@ def selectivity_sweep(thresholds):
       plan_text = explain_query(sql, (t,))
       parsed = parse_explain(plan_text)
       parsed["threshold"] = t
-      parsed["plain_text"] = plan_text
+      parsed["plan_text"] = plan_text
       results.append(parsed)
     return results
 
@@ -173,8 +173,8 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Connection failed: {e}")
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Author Search", "Page Filter", "Top Rated", "Explain + Index"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["Author Search", "Page Filter", "Top Rated", "Explain + Index", "Selectivity Demo]
 )
 
 with tab1:
@@ -266,3 +266,60 @@ with tab4:
         st.code(result["before_plan"], language="sql")
         st.text("After plan")
         st.code(result["after_plan"], language="sql")
+with tab 5:
+    st.subheader("Selectivity vs Plan Choice")
+    st.markdown("**Query:** `SELECT ... FROM books WHERE average_rating >= threshold`")
+
+    min_t = st.number_input("Min Threshold", value=0.0, step=0.5,
+                            min_value=0.0, max_value=5.0)
+    max_t = st.number_input("Max Threshold", value=5.0, step=0.5,
+                            min_value=0.0, max_value=5.0)
+    steps = st.slider("Number of threshold steps", min_value=3, max_value=15, value=8)
+
+if st.button("Run Selectivity Sweep"):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(INDEX_RATING)
+            cur.execute("ANALYZE books")
+            conn.commit()
+
+    thresholds = [
+        round(min_t + (max_t - min_t) * i / (steps - 1), 2)
+        for i in range(steps)
+    ]
+    sweep = selectivity_sweep(thresholds)
+
+summary_df = pd.DataFrame([
+    {
+        "threshold": r["threshold"],
+        "scan_type": r["scan_type"],
+        "estimated_rows": r["estimated_rows"],
+        "actual rows": r["actual_rows"],
+        "total_cost": r["total_cost"],
+        "execution_ms": r["execution_time"],
+    }
+    for r in sweep
+])
+st.dataframe(summary_df, use_container_width=True)
+
+transitions = []
+for i in range(1, len(sweep)):
+    if sweep[i]["scan_type"] != sweep[i - 1]["scan_type"]:
+        transitions_append(
+            f"At threshold {sweep[i]['threshold']}: "
+            f"{sweep[i-1]['scan_type']} -> {sweep[i]['scan_type']}"
+        )
+if transitions:
+    st.success("**Plan transitions detected:**\n\n" + "\n\n".join(transitions))
+else:
+    st.info("No plan transition in this range - try a wider threshold span.")
+
+st.markdown("### Inspect individual plan")
+pick = st.selectbox(
+    "Pick a threshold to see full EXPLAIN output",
+    options=[r["threshold"] for r in sweep],
+)
+chosen = next(r for r in sweep if r["threshold"] == pick)
+st.code(chosen["plan_text"], language="sql)
+        
+    
