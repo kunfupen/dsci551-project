@@ -266,7 +266,7 @@ with tab4:
         st.code(result["before_plan"], language="sql")
         st.text("After plan")
         st.code(result["after_plan"], language="sql")
-with tab 5:
+with tab5:
     st.subheader("Selectivity vs Plan Choice")
     st.markdown("**Query:** `SELECT ... FROM books WHERE average_rating >= threshold`")
 
