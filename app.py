@@ -251,14 +251,14 @@ with tab4:
         sql = """
             SELECT title, authors, average_rating
             FROM books
-            WHERE authors ILIKE %s
+            WHERE authors LIKE %s
         """
         params = (f"{author_exp}%",)
         index_sql = INDEX_AUTHORS
         index_name = "idx_books_authors_rating"
 
     elif query_type == "Page Filter":
-        min_exp = st.number_input("Explain min pages", min_value=0, value=100)
+        min_exp = st.number_input("Explain min pages", min_value=0, value=1000)
         max_exp = st.number_input("Explain max pages", min_value=0, value=1500)
         sql = """
             SELECT title, authors, num_pages
