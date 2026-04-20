@@ -97,10 +97,10 @@ def parse_explain(plain_text):
     results = {}
 
     # Look for the scan type in the Explain
-    if "Index Scan" in plain_text:
-        results["scan_type"] = "Index Scan"
-    elif "Bitmap Heap Scan" in plain_text:
+    if "Bitmap Heap Scan" in plain_text:
         results["scan_type"] = "Bitmap Heap Scan"
+    elif "Index Scan" in plain_text:
+        results["scan_type"] = "Index Scan"
     else:
         results["scan_type"] = "Sequential Scan"
 
