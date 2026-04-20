@@ -155,7 +155,7 @@ def explain_query_forced(sql, params=None):
             cur.execute("EXPLAIN ANALYZE " + sql, params)
             rows = cur.fetchall()
             cur.execute("SET enable_seqscan = on")
-    return "\n".join(row[0] for row in rows)
+            return "\n".join(row[0] for row in rows)
 
 
 def selectivity_sweep(thresholds):
