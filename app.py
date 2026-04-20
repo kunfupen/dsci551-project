@@ -221,7 +221,7 @@ if st.button("Show indexes"):
         except Exception as e:
             st.error(f"Query failed: {e}")
 
-    if st.button("Row count"):
+if st.button("Row count"):
         try:
             with get_conn() as conn:
                 with conn.cursor() as cur:
