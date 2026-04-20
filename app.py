@@ -247,7 +247,7 @@ with tab4:
     )
 
     if query_type == "Author Search":
-        author_exp = st.text_input("Author for explain", value="Rowling")
+        author_exp = st.text_input("Author for explain", value="J.K. Rowling")
         sql = """
             SELECT title, authors, average_rating
             FROM books
