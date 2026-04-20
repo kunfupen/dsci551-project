@@ -159,7 +159,7 @@ def explain_query_forced(sql, params=None):
 
 
 def selectivity_sweep(thresholds):
-    sql = """SELECT title, authors, average_rating FROM books WHERE average_rating >= %s"""
+    sql = """SELECT title, authors, average_rating FROM books WHERE average_rating >= %s::numeric"""
 
     results = []
     for t in thresholds:
