@@ -151,9 +151,10 @@ def explain_query_forced(sql, params=None):
     """Run EXPLAIN ANALYZE with sequential scan disabled."""
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SET LOCAL enable_seqscan = off")
+            cur.execute("SET enable_seqscan = off")
             cur.execute("EXPLAIN ANALYZE " + sql, params)
             rows = cur.fetchall()
+            cur.execute("SET enable_seqscan = on")
     return "\n".join(row[0] for row in rows)
 
 
