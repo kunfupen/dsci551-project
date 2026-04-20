@@ -252,7 +252,7 @@ with tab4:
             FROM books
             WHERE authors = %s
         """
-        params = (f"%{author_exp}%",)
+        params = (author_exp,)
         index_sql = INDEX_AUTHORS
         index_name = "idx_books_authors_rating"
 
