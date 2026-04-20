@@ -252,7 +252,7 @@ with tab4:
         index_sql = INDEX_RATING
 
     if st.button("Compare Before and After Index"):
-        result = compare_indexes(sql, params, index_sql)
+        result = compare_indexes(sql, params, index_sql, index_name)
 
         b = result["before"]
         a = result["after"]
