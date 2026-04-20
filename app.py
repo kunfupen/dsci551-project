@@ -331,6 +331,10 @@ with tab5:
     if "sweep_results" in st.session_state:
         sweep = st.session_state["sweep_results"]
 
+        # DEBUG: show raw forced plan for the first threshold
+        st.text("DEBUG — raw forced plan:")
+        st.code(sweep[0]["forced_plan_text"], language="sql")
+
         summary_df = pd.DataFrame([
             {
                 "threshold": r["threshold"],
