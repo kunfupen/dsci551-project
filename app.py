@@ -123,7 +123,7 @@ def parse_explain(plain_text):
     return results
 
 
-def compare_indexes(sql, params, index_sql):
+def compare_indexes(sql, params, index_sql, index_name):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(f"DROP INDEX IF EXISTS {index_name}")
