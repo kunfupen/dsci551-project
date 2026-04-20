@@ -202,34 +202,6 @@ with st.sidebar:
             st.success("Connected")
         except Exception as e:
             st.error(f"Connection failed: {e}")
-if st.button("Show indexes"):
-        try:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT indexname, indexdef
-                        FROM pg_indexes
-                        WHERE tablename = 'books'
-                    """)
-                    indexes = cur.fetchall()
-            if not indexes:
-                st.error("No indexes found on books table!")
-            else:
-                for name, definition in indexes:
-                    st.text(f"✓ {name}")
-                    st.caption(definition)
-        except Exception as e:
-            st.error(f"Query failed: {e}")
-
-if st.button("Row count"):
-        try:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT COUNT(*) FROM books")
-                    count = cur.fetchone()[0]
-            st.info(f"books table has {count:,} rows")
-        except Exception as e:
-            st.error(f"Query failed: {e}")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Author Search", "Page Filter", "Top Rated", "Explain + Index", "Selectivity Demo"]
@@ -275,19 +247,19 @@ with tab4:
     )
 
     if query_type == "Author Search":
-        author_exp = st.text_input("Author for explain", value="J.K. Rowling")
+        author_exp = st.text_input("Author for explain", value="Rowling")
         sql = """
             SELECT title, authors, average_rating
             FROM books
-            WHERE authors = %s
+            WHERE authors ILIKE %s
         """
-        params = (author_exp,)
+        params = (f"{author_exp}%",)
         index_sql = INDEX_AUTHORS
         index_name = "idx_books_authors_rating"
 
     elif query_type == "Page Filter":
         min_exp = st.number_input("Explain min pages", min_value=0, value=100)
-        max_exp = st.number_input("Explain max pages", min_value=0, value=500)
+        max_exp = st.number_input("Explain max pages", min_value=0, value=1500)
         sql = """
             SELECT title, authors, num_pages
             FROM books
@@ -358,10 +330,6 @@ with tab5:
 
     if "sweep_results" in st.session_state:
         sweep = st.session_state["sweep_results"]
-
-        # DEBUG: show raw forced plan for the first threshold
-        st.text("DEBUG — raw forced plan:")
-        st.code(sweep[0]["forced_plan_text"], language="sql")
 
         summary_df = pd.DataFrame([
             {
