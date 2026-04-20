@@ -147,18 +147,42 @@ def compare_indexes(sql, params, index_sql, index_name):
         "after_plan": after_plan,
     }
 
+def explain_query_forced(sql, params=None):
+    """Run EXPLAIN ANALYZE with sequential scan disabled."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET LOCAL enable_seqscan = off")
+            cur.execute("EXPLAIN ANALYZE " + sql, params)
+            rows = cur.fetchall()
+    return "\n".join(row[0] for row in rows)
+
+
 def selectivity_sweep(thresholds):
     sql = """SELECT title, authors, average_rating FROM books WHERE average_rating >= %s"""
 
     results = []
     for t in thresholds:
-      plan_text = explain_query(sql, (t,))
-      parsed = parse_explain(plan_text)
-      parsed["threshold"] = t
-      parsed["plan_text"] = plan_text
-      results.append(parsed)
-    return results
+        # Natural plan (what the planner picks on its own)
+        natural_plan = explain_query(sql, (t,))
+        natural = parse_explain(natural_plan)
 
+        # Forced plan (what the planner would do if Seq Scan were disabled)
+        forced_plan = explain_query_forced(sql, (t,))
+        forced = parse_explain(forced_plan)
+
+        results.append({
+            "threshold": t,
+            "natural_scan": natural.get("scan_type"),
+            "natural_cost": natural.get("total_cost"),
+            "natural_ms": natural.get("execution_time"),
+            "natural_est_rows": natural.get("estimated_rows"),
+            "forced_scan": forced.get("scan_type"),
+            "forced_cost": forced.get("total_cost"),
+            "forced_ms": forced.get("execution_time"),
+            "natural_plan_text": natural_plan,
+            "forced_plan_text": forced_plan,
+        })
+    return results
 
 def rows_to_df(rows, columns):
     return pd.DataFrame(rows, columns=columns)
@@ -278,6 +302,11 @@ with tab5:
     st.subheader("Selectivity vs Plan Choice")
 
     st.markdown("**Query:** `SELECT ... FROM books WHERE average_rating >= threshold`")
+    st.caption(
+        "For each threshold we run the query twice: once letting the planner "
+        "choose freely (natural), and once forcing it to avoid Seq Scan (forced). "
+        "Compare the cost columns to see why the planner picks what it picks."
+    )
 
     min_t = st.number_input("Min threshold", value=0.0, step=0.5,
                             min_value=0.0, max_value=5.0)
@@ -304,35 +333,29 @@ with tab5:
         summary_df = pd.DataFrame([
             {
                 "threshold": r["threshold"],
-                "scan_type": r["scan_type"],
-                "estimated_rows": r["estimated_rows"],
-                "actual_rows": r["actual_rows"],
-                "total_cost": r["total_cost"],
-                "execution_ms": r["execution_time"],
+                "natural_scan": r["natural_scan"],
+                "natural_cost": r["natural_cost"],
+                "natural_ms": r["natural_ms"],
+                "est_rows": r["natural_est_rows"],
+                "forced_scan": r["forced_scan"],
+                "forced_cost": r["forced_cost"],
+                "forced_ms": r["forced_ms"],
             }
             for r in sweep
         ])
         st.dataframe(summary_df, use_container_width=True)
 
-        transitions = []
-        for i in range(1, len(sweep)):
-            if sweep[i]["scan_type"] != sweep[i - 1]["scan_type"]:
-                transitions.append(
-                    f"At threshold {sweep[i]['threshold']}: "
-                    f"{sweep[i-1]['scan_type']} → {sweep[i]['scan_type']}"
-                )
-        if transitions:
-            st.success("**Plan transitions detected:**\n\n" + "\n\n".join(transitions))
-        else:
-            st.info("No plan transition in this range — try a wider threshold span.")
 
         st.markdown("### Inspect individual plan")
         pick = st.selectbox(
-            "Pick a threshold to see full EXPLAIN output",
+            "Pick a threshold",
             options=[r["threshold"] for r in sweep],
         )
+        mode = st.radio("Plan mode", ["natural", "forced"], horizontal=True)
+
         chosen = next((r for r in sweep if r["threshold"] == pick), None)
         if chosen:
-            st.code(chosen["plan_text"], language="sql")
+            key = "natural_plan_text" if mode == "natural" else "forced_plan_text"
+            st.code(chosen[key], language="sql")
         
     
