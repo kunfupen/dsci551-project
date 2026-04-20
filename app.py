@@ -117,7 +117,7 @@ def parse_explain(plain_text):
     results["estimated_rows"] = int(rows_match.group(1)) if rows_match else None
 
     # Pull the actual rows returned
-    actual_match = re.search(r"Actual Time: [\d.]+\.\.[\d.]+ rows=(\d+)", plain_text)
+    actual_match = re.search(r"actual time=[\d.]+\.\.[\d.]+ rows=(\d+)", plain_text)
     results["actual_rows"] = int(actual_match.group(1)) if actual_match else None
 
     return results
@@ -128,15 +128,17 @@ def compare_indexes(sql, params, index_sql, index_name):
         with conn.cursor() as cur:
             cur.execute(f"DROP INDEX IF EXISTS {index_name}")
             conn.commit()
-        before_plan = explain_query(sql, params)
-        before = parse_explain(before_plan)
+    before_plan = explain_query(sql, params)
+    before = parse_explain(before_plan)
 
-        con.execute(index_sql)
-        cur.execute("ANALYZE books")
-        conn.commit()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(index_sql)
+            cur.execute("ANALYZE books")
+            conn.commit()
 
-        after_plan = explain_query(sql, params)
-        after = parse_explain(after_plan)
+    after_plan = explain_query(sql, params)
+    after = parse_explain(after_plan)
 
     return {
         "before": before,
@@ -220,14 +222,15 @@ with tab4:
     )
 
     if query_type == "Author Search":
-        author_exp = st.text_input("Author for explain", value="Rowling")
+        author_exp = st.text_input("Author for explain", value="J.K. Rowling")
         sql = """
             SELECT title, authors, average_rating
             FROM books
-            WHERE authors ILIKE %s
+            WHERE authors = %s
         """
         params = (f"%{author_exp}%",)
         index_sql = INDEX_AUTHORS
+        index_name = "idx_books_authors_rating"
 
     elif query_type == "Page Filter":
         min_exp = st.number_input("Explain min pages", min_value=0, value=100)
@@ -239,6 +242,7 @@ with tab4:
         """
         params = (min_exp, max_exp)
         index_sql = INDEX_NUM_PAGES
+        index_name = "idx_books_num_pages"
 
     else:
         limit_exp = st.number_input("Explain top limit", min_value=1, value=20)
@@ -250,6 +254,7 @@ with tab4:
         """
         params = (limit_exp,)
         index_sql = INDEX_RATING
+        index_name = "idx_books_average_rating"
 
     if st.button("Compare Before and After Index"):
         result = compare_indexes(sql, params, index_sql, index_name)
@@ -291,7 +296,10 @@ with tab5:
             round(min_t + (max_t - min_t) * i / (steps - 1), 2)
             for i in range(steps)
         ]
-        sweep = selectivity_sweep(thresholds)
+        st.session_state["sweep_results"] = selectivity_sweep(thresholds)
+
+    if "sweep_results" in st.session_state:
+        sweep = st.session_state["sweep_results"]
 
         summary_df = pd.DataFrame([
             {
@@ -323,7 +331,8 @@ with tab5:
             "Pick a threshold to see full EXPLAIN output",
             options=[r["threshold"] for r in sweep],
         )
-        chosen = next(r for r in sweep if r["threshold"] == pick)
-        st.code(chosen["plan_text"], language="sql")
+        chosen = next((r for r in sweep if r["threshold"] == pick), None)
+        if chosen:
+            st.code(chosen["plan_text"], language="sql")
         
     
