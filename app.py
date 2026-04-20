@@ -202,6 +202,34 @@ with st.sidebar:
             st.success("Connected")
         except Exception as e:
             st.error(f"Connection failed: {e}")
+if st.button("Show indexes"):
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT indexname, indexdef
+                        FROM pg_indexes
+                        WHERE tablename = 'books'
+                    """)
+                    indexes = cur.fetchall()
+            if not indexes:
+                st.error("No indexes found on books table!")
+            else:
+                for name, definition in indexes:
+                    st.text(f"✓ {name}")
+                    st.caption(definition)
+        except Exception as e:
+            st.error(f"Query failed: {e}")
+
+    if st.button("Row count"):
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM books")
+                    count = cur.fetchone()[0]
+            st.info(f"books table has {count:,} rows")
+        except Exception as e:
+            st.error(f"Query failed: {e}")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Author Search", "Page Filter", "Top Rated", "Explain + Index", "Selectivity Demo"]
