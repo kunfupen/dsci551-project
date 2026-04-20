@@ -124,16 +124,19 @@ def parse_explain(plain_text):
 
 
 def compare_indexes(sql, params, index_sql):
-    before_plan = explain_query(sql, params)
-    before = parse_explain(before_plan)
-
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(index_sql)
+            cur.execute(f"DROP INDEX IF EXISTS {index_name}")
             conn.commit()
+        before_plan = explain_query(sql, params)
+        before = parse_explain(before_plan)
 
-    after_plan = explain_query(sql, params)
-    after = parse_explain(after_plan)
+        con.execute(index_sql)
+        cur.execute("ANALYZE books")
+        conn.commit()
+
+        after_plan = explain_query(sql, params)
+        after = parse_explain(after_plan)
 
     return {
         "before": before,
