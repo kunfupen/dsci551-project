@@ -10,9 +10,17 @@ Books Explorer: a Streamlit app over a Postgres database of books, plus helper s
 - `psql` client available on your PATH
 
 ## Environment Setup
+macOS/Linux:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Windows (PowerShell):
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
@@ -53,6 +61,9 @@ Then load schema and data:
 ```bash
 psql -d books -f schema.sql
 ```
+
+If you see `\copy: parse error at end of line`, `schema.sql` has a multi-line `\copy` command.
+`psql` requires `\copy` to be a single line. Update `schema.sql` accordingly, then re-run.
 
 The script loads `data/books_clean.csv` by default. To load a different file:
 
