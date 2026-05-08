@@ -25,18 +25,6 @@ CREATE INDEX IF NOT EXISTS idx_books_num_pages
 CREATE INDEX IF NOT EXISTS idx_books_average_rating
     ON books (average_rating);
 
--- Default CSV path if caller does not pass one
-\if :{?csv_path}
-\else
-\set csv_path 'data/books_clean.csv'
-\endif
-
-\copy books (
-    bookid, title, authors, average_rating, isbn, isbn13,
-    language_code, num_pages, ratings_count, text_reviews_count,
-    publication_date, publisher
-)
-FROM :'csv_path'
-WITH (FORMAT csv, HEADER true, QUOTE '"', ESCAPE '"');
+\copy books (bookid, title, authors, average_rating, isbn, isbn13, language_code, num_pages, ratings_count, text_reviews_count, publication_date, publisher) FROM 'data/books_clean.csv' WITH (FORMAT csv, HEADER true, QUOTE '"', ESCAPE '"');
 
 ANALYZE books;

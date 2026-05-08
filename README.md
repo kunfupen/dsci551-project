@@ -62,14 +62,7 @@ Then load schema and data:
 psql -d books -f schema.sql
 ```
 
-If you see `\copy: parse error at end of line`, `schema.sql` has a multi-line `\copy` command.
-`psql` requires `\copy` to be a single line. Update `schema.sql` accordingly, then re-run.
-
-The script loads `data/books_clean.csv` by default. To load a different file:
-
-```bash
-psql -d books -v csv_path='data/your_file.csv' -f schema.sql
-```
+The script loads `data/books_clean.csv` from the repo root by default.
 
 ## Run the Application
 ```bash
